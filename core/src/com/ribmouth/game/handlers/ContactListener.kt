@@ -7,17 +7,30 @@ import com.badlogic.gdx.physics.box2d.ContactListener
  * Created by RibMouth on 3/11/2017.
  */
 class ContactListener : ContactListener {
+    var playerOnGround: Boolean = false
+
     //Called when 2 fixtures start to collide
     override fun beginContact(contact: Contact?) {
         val fa: Fixture? = contact?.fixtureA
         val fb: Fixture? = contact?.fixtureB
 
-        println("${fa?.userData}, ${fb?.userData}")
+        if(fa?.userData == null || fb?.userData == null) return
+
+        if(fa.userData == "foot" || fb.userData == "foot") {
+            playerOnGround = true
+        }
     }
 
     //Called when 2 fixtures no longer collide
     override fun endContact(contact: Contact?) {
+        val fa: Fixture? = contact?.fixtureA
+        val fb: Fixture? = contact?.fixtureB
 
+        if(fa?.userData == null || fb?.userData == null) return
+
+        if(fa.userData == "foot" || fb.userData == "foot") {
+            playerOnGround = false
+        }
     }
 
     //Collision detection

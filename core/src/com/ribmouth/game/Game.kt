@@ -3,6 +3,8 @@ package com.ribmouth.game
 import com.badlogic.gdx.ApplicationAdapter
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
+import com.ribmouth.game.handlers.BBInput
+import com.ribmouth.game.handlers.BBInputProcessor
 import com.ribmouth.game.handlers.GameStateManager
 
 /**
@@ -22,6 +24,8 @@ class Game : ApplicationAdapter() {
         private set
 
     override fun create() {
+        Gdx.input.inputProcessor = BBInputProcessor()
+
         sb = SpriteBatch()
         gsm = GameStateManager(this)
     }
@@ -30,6 +34,7 @@ class Game : ApplicationAdapter() {
         Gdx.graphics.setTitle(TITLE + " -- FPS: " + Gdx.graphics.framesPerSecond)
         gsm.update(Gdx.graphics.deltaTime)
         gsm.render()
+        BBInput.update()
     }
 
     override fun dispose() {
