@@ -5,6 +5,7 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.ribmouth.game.handlers.BBInput
 import com.ribmouth.game.handlers.BBInputProcessor
+import com.ribmouth.game.handlers.Content
 import com.ribmouth.game.handlers.GameStateManager
 
 /**
@@ -23,8 +24,13 @@ class Game : ApplicationAdapter() {
     lateinit var gsm: GameStateManager
         private set
 
+    var res: Content = Content()
+        private set
+
     override fun create() {
         Gdx.input.inputProcessor = BBInputProcessor()
+
+        res.loadTexture("images/bunny.png", "bunny")
 
         sb = SpriteBatch()
         gsm = GameStateManager(this)

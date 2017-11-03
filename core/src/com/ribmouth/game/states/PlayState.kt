@@ -14,6 +14,8 @@ import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.DynamicBody
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.StaticBody
 import com.ribmouth.game.Game.Companion.HEIGHT
 import com.ribmouth.game.Game.Companion.WIDTH
+import com.ribmouth.game.handlers.B2DVars.Companion.BIT_BLUE
+import com.ribmouth.game.handlers.B2DVars.Companion.BIT_GREEN
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_PLAYER
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_RED
 import com.ribmouth.game.handlers.B2DVars.Companion.PPM
@@ -30,7 +32,7 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
     private val world: World = World(Vector2(0f, -9.81f), true)
     private val b2dr: Box2DDebugRenderer = Box2DDebugRenderer()
     private val b2dCam: OrthographicCamera = OrthographicCamera()
-    private val playerBody: Body
+    lateinit private var playerBody: Body
     private val contactListener: ContactListener = ContactListener()
     private var tileSize: Float = 0f
 
@@ -39,70 +41,17 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
     private val tileMapRenderer: OrthogonalTiledMapRenderer = OrthogonalTiledMapRenderer(tileMap)
 
     init {
+        //Setup box2d stuff
         world.setContactListener(contactListener)
 
-        //Create platform
-        val bDef = BodyDef()
-        var shape = PolygonShape()
-        val fDef = FixtureDef()
-
-        //static body - don't move, unaffected by forces
-        //kinematic forces - don't get affected by forces but can move
-        //dynamic body - always affected by forces
-
         //Create player
-        bDef.position.set(160f / PPM, 200f / PPM)
-        bDef.type = DynamicBody
-        playerBody = world.createBody(bDef)
+        createPlayer()
 
-        shape.setAsBox(5f / PPM, 5f / PPM)
-        fDef.shape = shape
-        fDef.filter.categoryBits = BIT_PLAYER
-        fDef.filter.maskBits = BIT_RED
-        playerBody.createFixture(fDef).userData = "player"
-
-        //Create foot sensor
-        shape.setAsBox(2f / PPM, 2f / PPM, Vector2(0f, -5f / PPM), 0f)
-        fDef.shape = shape
-        fDef.filter.categoryBits = BIT_PLAYER
-        fDef.filter.maskBits = BIT_RED
-        fDef.isSensor = true
-        playerBody.createFixture(fDef).userData = "foot"
+        //Create tiles
+        createTiles()
 
         //Setup cam
         b2dCam.setToOrtho(false, WIDTH / PPM, HEIGHT / PPM)
-
-        //Map stuff
-        val layer: TiledMapTileLayer = tileMap.layers["red"] as TiledMapTileLayer
-        tileSize = layer.tileWidth
-
-        //Go through all the cells in the layer
-        for (row in 0 until layer.height) {
-            for (col in 0 until layer.width) {
-                //Get cell
-                val cell: Cell = layer.getCell(col, row) ?: continue
-
-                if(cell.tile == null) continue
-
-                //Create body + fixture
-                bDef.type = StaticBody
-                bDef.position.set((col + 0.5f) * tileSize / PPM, (row + 0.5f) * tileSize / PPM)
-
-                //val chainShape = ChainShape()
-                val vector2 = Array<Vector2>(3, { i -> Vector2.Zero })
-
-                vector2[0] = Vector2(-tileSize / 2 / PPM, -tileSize / 2 / PPM) //Bottom left corner
-                vector2[1] = Vector2(-tileSize / 2 / PPM, tileSize / 2 / PPM) //Top left corner
-                vector2[1] = Vector2(tileSize / 2 / PPM, tileSize / 2 / PPM) //Top Right corner
-
-                world.createBody(bDef).chain(vector2[0], vector2[1], vector2[2]) {
-                    friction = 0f
-                    filter.categoryBits = BIT_RED
-                    filter.maskBits = BIT_PLAYER
-                    isSensor = false
-                }
-            }
-        }
     }
 
     override fun handleInput() {
@@ -138,5 +87,73 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
 
     override fun resize(width: Int, height: Int) {
 
+    }
+
+    private fun createPlayer() {
+        val bDef = BodyDef()
+        var shape = PolygonShape()
+        val fDef = FixtureDef()
+
+        bDef.position.set(160f / PPM, 200f / PPM)
+        bDef.type = DynamicBody
+        playerBody = world.createBody(bDef)
+
+        shape.setAsBox(5f / PPM, 5f / PPM)
+        fDef.shape = shape
+        fDef.filter.categoryBits = BIT_PLAYER
+        fDef.filter.maskBits = BIT_RED
+        playerBody.createFixture(fDef).userData = "player"
+
+        //Foot sensor
+        shape.setAsBox(2f / PPM, 2f / PPM, Vector2(0f, -5f / PPM), 0f)
+        fDef.shape = shape
+        fDef.filter.categoryBits = BIT_PLAYER
+        fDef.filter.maskBits = BIT_RED
+        fDef.isSensor = true
+        playerBody.createFixture(fDef).userData = "foot"
+    }
+
+    private fun createTiles() {
+        tileSize = tileMap.properties.get("tilewidth", Float::class.java)
+        var layer: TiledMapTileLayer = tileMap.layers["red"] as TiledMapTileLayer
+        createLayer(layer, BIT_RED)
+
+        layer = tileMap.layers["green"] as TiledMapTileLayer
+        createLayer(layer, BIT_GREEN)
+
+        layer = tileMap.layers["blue"] as TiledMapTileLayer
+        createLayer(layer, BIT_BLUE)
+    }
+
+    private fun createLayer(layer: TiledMapTileLayer, bits: Short) {
+        val bDef = BodyDef()
+
+        //Go through all the cells in the layer
+        for (row in 0 until layer.height) {
+            for (col in 0 until layer.width) {
+                //Get cell
+                val cell: Cell = layer.getCell(col, row) ?: continue
+
+                if(cell.tile == null) continue
+
+                //Create body + fixture
+                bDef.type = StaticBody
+                bDef.position.set((col + 0.5f) * tileSize / PPM, (row + 0.5f) * tileSize / PPM)
+
+                //val chainShape = ChainShape()
+                val vector2 = Array<Vector2>(3, { i -> Vector2.Zero })
+
+                vector2[0] = Vector2(-tileSize / 2 / PPM, -tileSize / 2 / PPM) //Bottom left corner
+                vector2[1] = Vector2(-tileSize / 2 / PPM, tileSize / 2 / PPM) //Top left corner
+                vector2[1] = Vector2(tileSize / 2 / PPM, tileSize / 2 / PPM) //Top Right corner
+
+                world.createBody(bDef).chain(vector2[0], vector2[1], vector2[2]) {
+                    friction = 0f
+                    filter.categoryBits = bits
+                    filter.maskBits = BIT_PLAYER
+                    isSensor = false
+                }
+            }
+        }
     }
 }

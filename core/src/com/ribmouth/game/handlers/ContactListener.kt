@@ -7,17 +7,20 @@ import com.badlogic.gdx.physics.box2d.ContactListener
  * Created by RibMouth on 3/11/2017.
  */
 class ContactListener : ContactListener {
+    private var numFootContacts: Int = 0
+
     var playerOnGround: Boolean = false
+        get() = numFootContacts > 0
 
     //Called when 2 fixtures start to collide
     override fun beginContact(contact: Contact?) {
         val fa: Fixture? = contact?.fixtureA
         val fb: Fixture? = contact?.fixtureB
 
-        if(fa?.userData == null || fb?.userData == null) return
+        if(fa == null || fb == null) return
 
         if(fa.userData == "foot" || fb.userData == "foot") {
-            playerOnGround = true
+            numFootContacts++
         }
     }
 
@@ -26,10 +29,10 @@ class ContactListener : ContactListener {
         val fa: Fixture? = contact?.fixtureA
         val fb: Fixture? = contact?.fixtureB
 
-        if(fa?.userData == null || fb?.userData == null) return
+        if(fa == null || fb == null) return
 
         if(fa.userData == "foot" || fb.userData == "foot") {
-            playerOnGround = false
+            numFootContacts--
         }
     }
 
