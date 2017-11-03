@@ -14,6 +14,7 @@ import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.DynamicBody
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.StaticBody
 import com.ribmouth.game.Game.Companion.HEIGHT
 import com.ribmouth.game.Game.Companion.WIDTH
+import com.ribmouth.game.entities.Player
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_BLUE
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_GREEN
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_PLAYER
@@ -32,13 +33,15 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
     private val world: World = World(Vector2(0f, -9.81f), true)
     private val b2dr: Box2DDebugRenderer = Box2DDebugRenderer()
     private val b2dCam: OrthographicCamera = OrthographicCamera()
-    lateinit private var playerBody: Body
     private val contactListener: ContactListener = ContactListener()
-    private var tileSize: Float = 0f
 
     //Map loader and renderer
     private val tileMap: TiledMap = TmxMapLoader().load("maps/level1.tmx")
     private val tileMapRenderer: OrthogonalTiledMapRenderer = OrthogonalTiledMapRenderer(tileMap)
+    private var tileSize: Float = 0f
+
+    //Player
+    lateinit private var player: Player
 
     init {
         //Setup box2d stuff
@@ -57,7 +60,7 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
     override fun handleInput() {
         if(BBInput.isPressed(BUTTON1)) {
             if(contactListener.playerOnGround) {
-                playerBody.applyForceToCenter(0f, 200f, true) //Force is in Newtons upwards force
+                player.body.applyForceToCenter(0f, 200f, true) //Force is in Newtons upwards force
             }
         }
     }
@@ -66,6 +69,9 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
         handleInput()
 
         world.step(dt, 6, 2)
+
+        //Update player
+        player.update(dt)
     }
 
     override fun render() {
@@ -79,6 +85,12 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
 
         //Draw world
         b2dr.render(world, b2dCam.combined)
+
+        //Draw player
+        sb.projectionMatrix = cam.combined
+        sb.begin()
+        player.render(sb)
+        sb.end()
     }
 
     override fun dispose() {
@@ -96,21 +108,27 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
 
         bDef.position.set(160f / PPM, 200f / PPM)
         bDef.type = DynamicBody
-        playerBody = world.createBody(bDef)
+        bDef.linearVelocity.set(1f, 0f) //Make the player always go right
+        val body: Body = world.createBody(bDef)
 
-        shape.setAsBox(5f / PPM, 5f / PPM)
+        shape.setAsBox(13f / PPM, 13f / PPM)
         fDef.shape = shape
         fDef.filter.categoryBits = BIT_PLAYER
         fDef.filter.maskBits = BIT_RED
-        playerBody.createFixture(fDef).userData = "player"
+        body.createFixture(fDef).userData = "player"
 
         //Foot sensor
-        shape.setAsBox(2f / PPM, 2f / PPM, Vector2(0f, -5f / PPM), 0f)
+        shape.setAsBox(13f / PPM, 2f / PPM, Vector2(0f, -13f / PPM), 0f)
         fDef.shape = shape
         fDef.filter.categoryBits = BIT_PLAYER
         fDef.filter.maskBits = BIT_RED
         fDef.isSensor = true
-        playerBody.createFixture(fDef).userData = "foot"
+        body.createFixture(fDef).userData = "foot"
+
+        //Create player
+        player = Player(body)
+
+        body.userData = player
     }
 
     private fun createTiles() {

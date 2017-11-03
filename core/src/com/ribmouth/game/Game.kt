@@ -17,14 +17,14 @@ class Game : ApplicationAdapter() {
         const val WIDTH = 320f
         const val HEIGHT = 240f
         const val SCALE = 2
+
+        var res: Content = Content()
+            private set
     }
 
     lateinit var sb: SpriteBatch
         private set
     lateinit var gsm: GameStateManager
-        private set
-
-    var res: Content = Content()
         private set
 
     override fun create() {
