@@ -31,6 +31,7 @@ class Game : ApplicationAdapter() {
         Gdx.input.inputProcessor = BBInputProcessor()
 
         res.loadTexture("images/bunny.png", "bunny")
+        res.loadTexture("images/crystal.png", "crystal")
 
         sb = SpriteBatch()
         gsm = GameStateManager(this)

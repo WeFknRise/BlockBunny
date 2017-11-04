@@ -8,6 +8,8 @@ import com.badlogic.gdx.physics.box2d.ContactListener
  */
 class ContactListener : ContactListener {
     private var numFootContacts: Int = 0
+    var bodiesToRemove: MutableList<Body> = mutableListOf()
+        private set
 
     var playerOnGround: Boolean = false
         get() = numFootContacts > 0
@@ -19,8 +21,18 @@ class ContactListener : ContactListener {
 
         if(fa == null || fb == null) return
 
-        if(fa.userData == "foot" || fb.userData == "foot") {
+        if(checkUserData("foot", fa) || checkUserData("foot", fb)) {
             numFootContacts++
+        }
+
+        if(checkUserData("crystal", fa)) {
+            //Remove crystal
+            bodiesToRemove.add(fa.body)
+        }
+
+        if (checkUserData("crystal", fb)) {
+            //Remove crystal
+            bodiesToRemove.add(fb.body)
         }
     }
 
@@ -31,9 +43,17 @@ class ContactListener : ContactListener {
 
         if(fa == null || fb == null) return
 
-        if(fa.userData == "foot" || fb.userData == "foot") {
+        if(checkUserData("foot", fa) || checkUserData("foot", fb)) {
             numFootContacts--
         }
+
+        if(checkUserData("crystal", fa) || checkUserData("crystal", fb)) {
+
+        }
+    }
+
+    private fun checkUserData(ud: String, f: Fixture): Boolean {
+        return f.userData != null && f.userData == ud
     }
 
     //Collision detection

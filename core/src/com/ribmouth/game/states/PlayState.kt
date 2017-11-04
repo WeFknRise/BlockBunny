@@ -14,8 +14,10 @@ import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.DynamicBody
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.StaticBody
 import com.ribmouth.game.Game.Companion.HEIGHT
 import com.ribmouth.game.Game.Companion.WIDTH
+import com.ribmouth.game.entities.Crystal
 import com.ribmouth.game.entities.Player
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_BLUE
+import com.ribmouth.game.handlers.B2DVars.Companion.BIT_CRYSTAL
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_GREEN
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_PLAYER
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_RED
@@ -25,11 +27,14 @@ import com.ribmouth.game.handlers.BBInput.Companion.BUTTON1
 import com.ribmouth.game.handlers.ContactListener
 import com.ribmouth.game.handlers.GameStateManager
 import ktx.box2d.chain
+import kotlin.experimental.or
 
 /**
  * Created by RibMouth on 2/11/2017.
  */
 class PlayState(gsm: GameStateManager) : GameState(gsm) {
+    private val debug: Boolean = false
+
     private val world: World = World(Vector2(0f, -9.81f), true)
     private val b2dr: Box2DDebugRenderer = Box2DDebugRenderer()
     private val b2dCam: OrthographicCamera = OrthographicCamera()
@@ -43,6 +48,9 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
     //Player
     lateinit private var player: Player
 
+    //Crystals
+    lateinit private var crystals: MutableList<Crystal>
+
     init {
         //Setup box2d stuff
         world.setContactListener(contactListener)
@@ -53,6 +61,9 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
         //Create tiles
         createTiles()
 
+        //Create objects
+        createCrystals()
+
         //Setup cam
         b2dCam.setToOrtho(false, WIDTH / PPM, HEIGHT / PPM)
     }
@@ -60,7 +71,7 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
     override fun handleInput() {
         if(BBInput.isPressed(BUTTON1)) {
             if(contactListener.playerOnGround) {
-                player.body.applyForceToCenter(0f, 200f, true) //Force is in Newtons upwards force
+                player.body.applyForceToCenter(0f, 250f, true) //Force is in Newtons upwards force
             }
         }
     }
@@ -70,8 +81,22 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
 
         world.step(dt, 6, 2)
 
+        //Remove bodies
+        val bodies = contactListener.bodiesToRemove
+        for (body in bodies) {
+            crystals.removeIf { c -> c == body.userData as Crystal }
+            world.destroyBody(body)
+            player.collectCrystal()
+        }
+        bodies.clear()
+
         //Update player
         player.update(dt)
+
+        //Update crystals
+        for (crystal in crystals) {
+            crystal.update(dt)
+        }
     }
 
     override fun render() {
@@ -83,14 +108,21 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
         tileMapRenderer.setView(cam)
         tileMapRenderer.render()
 
-        //Draw world
-        b2dr.render(world, b2dCam.combined)
-
-        //Draw player
         sb.projectionMatrix = cam.combined
         sb.begin()
+
+        //Render player
         player.render(sb)
+
+        //Render crystals
+        for (crystal in crystals) {
+            crystal.render(sb)
+        }
+
         sb.end()
+
+        //Draw world
+        if(debug) b2dr.render(world, b2dCam.combined)
     }
 
     override fun dispose() {
@@ -106,15 +138,15 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
         var shape = PolygonShape()
         val fDef = FixtureDef()
 
-        bDef.position.set(160f / PPM, 200f / PPM)
+        bDef.position.set(100f / PPM, 200f / PPM)
         bDef.type = DynamicBody
-        bDef.linearVelocity.set(1f, 0f) //Make the player always go right
+        bDef.linearVelocity.set(0.5f, 0f) //Make the player always go right
         val body: Body = world.createBody(bDef)
 
         shape.setAsBox(13f / PPM, 13f / PPM)
         fDef.shape = shape
         fDef.filter.categoryBits = BIT_PLAYER
-        fDef.filter.maskBits = BIT_RED
+        fDef.filter.maskBits = BIT_RED or BIT_CRYSTAL
         body.createFixture(fDef).userData = "player"
 
         //Foot sensor
@@ -158,12 +190,11 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
                 bDef.type = StaticBody
                 bDef.position.set((col + 0.5f) * tileSize / PPM, (row + 0.5f) * tileSize / PPM)
 
-                //val chainShape = ChainShape()
                 val vector2 = Array<Vector2>(3, { i -> Vector2.Zero })
 
                 vector2[0] = Vector2(-tileSize / 2 / PPM, -tileSize / 2 / PPM) //Bottom left corner
                 vector2[1] = Vector2(-tileSize / 2 / PPM, tileSize / 2 / PPM) //Top left corner
-                vector2[1] = Vector2(tileSize / 2 / PPM, tileSize / 2 / PPM) //Top Right corner
+                vector2[2] = Vector2(tileSize / 2 / PPM, tileSize / 2 / PPM) //Top Right corner
 
                 world.createBody(bDef).chain(vector2[0], vector2[1], vector2[2]) {
                     friction = 0f
@@ -172,6 +203,39 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
                     isSensor = false
                 }
             }
+        }
+    }
+
+    private fun createCrystals() {
+        crystals = mutableListOf()
+
+        var layer = tileMap.layers.get("crystals")
+
+        val bDef = BodyDef()
+        val fDef = FixtureDef()
+
+        for (mo in layer.objects) {
+            bDef.type = StaticBody
+            val x = mo.properties.get("x", Float::class.java) / PPM
+            val y = mo.properties.get("y", Float::class.java) / PPM
+            bDef.position.set(x, y)
+
+            val cshape = CircleShape()
+            cshape.radius = 8f / PPM
+
+            fDef.shape = cshape
+            fDef.isSensor = true
+            fDef.filter.categoryBits = BIT_CRYSTAL
+            fDef.filter.maskBits = BIT_PLAYER
+
+            val body = world.createBody(bDef)
+            body.createFixture(fDef).userData = "crystal"
+
+            val type = mo.properties.get("type")
+
+            val c = Crystal(body)
+            body.userData = c
+            crystals.add(c)
         }
     }
 }
