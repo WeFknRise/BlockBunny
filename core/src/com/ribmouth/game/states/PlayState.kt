@@ -15,6 +15,7 @@ import com.badlogic.gdx.physics.box2d.BodyDef.BodyType.StaticBody
 import com.ribmouth.game.Game.Companion.HEIGHT
 import com.ribmouth.game.Game.Companion.WIDTH
 import com.ribmouth.game.entities.Crystal
+import com.ribmouth.game.entities.HUD
 import com.ribmouth.game.entities.Player
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_BLUE
 import com.ribmouth.game.handlers.B2DVars.Companion.BIT_CRYSTAL
@@ -24,9 +25,12 @@ import com.ribmouth.game.handlers.B2DVars.Companion.BIT_RED
 import com.ribmouth.game.handlers.B2DVars.Companion.PPM
 import com.ribmouth.game.handlers.BBInput
 import com.ribmouth.game.handlers.BBInput.Companion.BUTTON1
+import com.ribmouth.game.handlers.BBInput.Companion.BUTTON2
 import com.ribmouth.game.handlers.ContactListener
 import com.ribmouth.game.handlers.GameStateManager
 import ktx.box2d.chain
+import kotlin.experimental.and
+import kotlin.experimental.inv
 import kotlin.experimental.or
 
 /**
@@ -51,6 +55,9 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
     //Crystals
     lateinit private var crystals: MutableList<Crystal>
 
+    //HUD
+    private var hud: HUD
+
     init {
         //Setup box2d stuff
         world.setContactListener(contactListener)
@@ -64,15 +71,24 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
         //Create objects
         createCrystals()
 
+        //Create HUD
+        hud = HUD(player)
+
         //Setup cam
         b2dCam.setToOrtho(false, WIDTH / PPM, HEIGHT / PPM)
     }
 
     override fun handleInput() {
-        if(BBInput.isPressed(BUTTON1)) {
-            if(contactListener.playerOnGround) {
+        //Player jump -> W
+        if (BBInput.isPressed(BUTTON1)) {
+            if (contactListener.playerOnGround) {
                 player.body.applyForceToCenter(0f, 250f, true) //Force is in Newtons upwards force
             }
+        }
+
+        //Switch block -> X
+        if (BBInput.isPressed(BUTTON2)) {
+            switchBlocks()
         }
     }
 
@@ -104,6 +120,10 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
         Gdx.gl20.glClearColor(0.2f, 0.2f, 0.2f, 1f)
         Gdx.gl20.glClear(GL20.GL_COLOR_BUFFER_BIT)
 
+        //Set camera to follow player
+        cam.position.set(player.position.x * PPM + WIDTH / 4, HEIGHT / 2, 0f)
+        cam.update()
+
         //Draw tileMap
         tileMapRenderer.setView(cam)
         tileMapRenderer.render()
@@ -119,10 +139,14 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
             crystal.render(sb)
         }
 
+        //Render HUD
+        sb.projectionMatrix = hudCam.combined
+        hud.render(sb)
+
         sb.end()
 
         //Draw world
-        if(debug) b2dr.render(world, b2dCam.combined)
+        if (debug) b2dr.render(world, b2dCam.combined)
     }
 
     override fun dispose() {
@@ -140,7 +164,7 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
 
         bDef.position.set(100f / PPM, 200f / PPM)
         bDef.type = DynamicBody
-        bDef.linearVelocity.set(0.5f, 0f) //Make the player always go right
+        bDef.linearVelocity.set(1f, 0f) //Make the player always go right
         val body: Body = world.createBody(bDef)
 
         shape.setAsBox(13f / PPM, 13f / PPM)
@@ -184,7 +208,7 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
                 //Get cell
                 val cell: Cell = layer.getCell(col, row) ?: continue
 
-                if(cell.tile == null) continue
+                if (cell.tile == null) continue
 
                 //Create body + fixture
                 bDef.type = StaticBody
@@ -237,5 +261,38 @@ class PlayState(gsm: GameStateManager) : GameState(gsm) {
             body.userData = c
             crystals.add(c)
         }
+    }
+
+    private fun switchBlocks() {
+        val body = player.body.fixtureList.first()
+        val foot = player.body.fixtureList[1]
+
+        // get current bits set on player's body
+        var bits = body.filterData.maskBits
+        // temp filter data to hold data and set back to each fixture
+        var tmpFilterData: Filter
+
+        // switch to next color
+        // red -> green -> blue -> red
+        if ((bits and BIT_RED) != 0.toShort()) {
+            bits = bits and BIT_RED.inv() //Remove the red
+            bits = bits or BIT_GREEN //Add the green
+        } else if ((bits and BIT_GREEN) != 0.toShort()) {
+            bits = bits and BIT_GREEN.inv() //Remove the green
+            bits = bits or BIT_BLUE //Add the blue
+        } else if ((bits and BIT_BLUE) != 0.toShort()) {
+            bits = bits and BIT_BLUE.inv() //Remove the blue
+            bits = bits or BIT_RED //Add the red
+        }
+
+        // set new mask bits to body
+        tmpFilterData = body.filterData
+        tmpFilterData.maskBits = bits
+        body.filterData = tmpFilterData
+
+        // set new mask bits to foot
+        tmpFilterData = foot.filterData
+        tmpFilterData.maskBits = bits and BIT_CRYSTAL.inv()
+        foot.filterData = tmpFilterData
     }
 }

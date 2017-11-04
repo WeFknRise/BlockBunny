@@ -32,6 +32,7 @@ class Game : ApplicationAdapter() {
 
         res.loadTexture("images/bunny.png", "bunny")
         res.loadTexture("images/crystal.png", "crystal")
+        res.loadTexture("images/hud.png", "hud")
 
         sb = SpriteBatch()
         gsm = GameStateManager(this)
