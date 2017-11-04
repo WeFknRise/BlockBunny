@@ -16,8 +16,8 @@ object DesktopLauncher {
     fun main(args: Array<String>) {
         val config = LwjglApplicationConfiguration()
         config.title = TITLE
-        config.width = WIDTH * SCALE
-        config.height = HEIGHT * SCALE
+        config.width = WIDTH.toInt() * SCALE
+        config.height = HEIGHT.toInt() * SCALE
         LwjglApplication(Game(), config)
     }
 }
